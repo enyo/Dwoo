@@ -369,16 +369,37 @@ class Dwoo_Core
                 $dynamicId = uniqid();
             }
 
-            // render template
-            $compiledTemplate = $_tpl->getCompiledTemplate($this, $_compiler);
-            $out = include $compiledTemplate;
 
-            // template returned false so it needs to be recompiled
-            if ($out === false) {
-                $_tpl->forceCompilation();
-                $compiledTemplate = $_tpl->getCompiledTemplate($this, $_compiler);
-                $out = include $compiledTemplate;
+            $recompile = false;
+
+            do {
+                // render template
+                try {
+                    $compiledTemplate = $_tpl->getCompiledTemplate($this, $_compiler);
+                    $out = include $compiledTemplate;
+                }
+                catch (Exception $e) {
+                    // output
+                    if ($_output === true) {
+                        ob_flush();
+                    }
+                    else {
+                        ob_clean();
+                    }
+                    throw $e;
+                }
+
+                if ($out === false) {
+                    // template returned false so it needs to be recompiled
+                    if ($recompile) {
+                        // this is the second time this happened...
+                        throw new Dwoo_Exception('Failed to compile template.');
+                    }
+                    $_tpl->forceCompilation();
+                    $recompile = true;
+                }
             }
+            while($recompile);
 
             if ($doCache === true) {
                 $out = preg_replace('/(<%|%>|<\?php|<\?|\?>)/', '<?php /*'.$dynamicId.'*/ echo \'$1\'; ?>', $out);
